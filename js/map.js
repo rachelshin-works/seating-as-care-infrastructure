@@ -10,6 +10,21 @@ const UNDOC_COLORS = {
 const UNDOC_COLOR_DEFAULT = "#FF5E00";
 const LINE_SCALE = 0.4;
 
+/** 0 grey/documented … 4 hottest orange */
+const HEAT_BY_CATEGORY = {
+  documented: 0,
+  portable_seating: 1,
+  floor: 2,
+  small_infrastructure: 3,
+  staircase: 4,
+};
+
+function heatForCategory(categoryKey, kind) {
+  if (kind === "documented") return 0;
+  if (categoryKey in HEAT_BY_CATEGORY) return HEAT_BY_CATEGORY[categoryKey];
+  return 4;
+}
+
 function parseCsv(text, delimiter = ",") {
   const rows = [];
   let row = [];
@@ -82,6 +97,7 @@ function documentedToGeoJSON(text) {
         lng: cols[lngIdx] || "",
         lat: cols[latIdx] || "",
         date: cols[dateIdx] || "",
+        heat: 0,
       },
     });
   }
@@ -119,12 +135,64 @@ function undocumentedToGeoJSON(text) {
         lng: cols[lngIdx] || "",
         lat: cols[latIdx] || "",
         date: cols[dateIdx] || "",
+        heat: heatForCategory(categoryKey, "undocumented"),
       },
     });
   }
 
   return { type: "FeatureCollection", features };
 }
+
+function communityToGeoJSON(text) {
+  const rows = parseCsv(text, ",");
+  if (rows.length < 2) return { type: "FeatureCollection", features: [] };
+
+  const headers = rows[0].map((h) => h.replace(/^"|"$/g, "").trim());
+  const lngIdx = headers.indexOf("longitude");
+  const latIdx = headers.indexOf("latitude");
+  const catIdx = headers.indexOf("category");
+  const dateIdx = headers.indexOf("observed_date");
+  const rateIdx = headers.indexOf("rate");
+  const commentIdx = headers.indexOf("comment");
+
+  const features = [];
+  for (let i = 1; i < rows.length; i++) {
+    const cols = rows[i];
+    if (!cols.length || cols.every((c) => !String(c).trim())) continue;
+
+    const lat = parseFloat(cols[latIdx]);
+    const lng = parseFloat(cols[lngIdx]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+
+    const categoryKey = (cols[catIdx] || "").trim();
+    features.push({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [lng, lat] },
+      properties: {
+        kind: "undocumented",
+        category: categoryKey.replace(/_/g, " "),
+        categoryKey,
+        lng: String(lng),
+        lat: String(lat),
+        date: cols[dateIdx] || "",
+        rate: cols[rateIdx] || "",
+        comment: cols[commentIdx] || "",
+        heat: heatForCategory(categoryKey, "undocumented"),
+      },
+    });
+  }
+
+  return { type: "FeatureCollection", features };
+}
+
+function mergeFeatureCollections(...collections) {
+  return {
+    type: "FeatureCollection",
+    features: collections.flatMap((c) => c.features || []),
+  };
+}
+
+let undocumentedData = { type: "FeatureCollection", features: [] };
 
 const seatPopup = document.getElementById("seat-popup");
 const seatPopupType = document.getElementById("seat-popup-type");
@@ -179,7 +247,7 @@ function hideSeatPopup() {
   seatPopup.hidden = true;
 }
 
-seatPopupClose.addEventListener("click", hideSeatPopup);
+seatPopupClose?.addEventListener("click", hideSeatPopup);
 
 const POINT_RADIUS = [
   "interpolate",
@@ -195,20 +263,91 @@ const POINT_RADIUS = [
   9,
 ];
 
+const UNDOC_CIRCLE_COLOR = [
+  "match",
+  ["get", "categoryKey"],
+  "staircase",
+  UNDOC_COLORS.staircase,
+  "small_infrastructure",
+  UNDOC_COLORS.small_infrastructure,
+  "floor",
+  UNDOC_COLORS.floor,
+  "portable_seating",
+  UNDOC_COLORS.portable_seating,
+  UNDOC_COLOR_DEFAULT,
+];
+
+function showMapError(message) {
+  const el = document.getElementById("map");
+  if (!el) return;
+  el.classList.add("map-error");
+  el.textContent = message;
+}
+
+if (typeof maplibregl === "undefined") {
+  showMapError("map library failed to load — refresh or check network");
+  throw new Error("maplibregl missing");
+}
+
 const map = new maplibregl.Map({
   container: "map",
   style: "https://tiles.openfreemap.org/styles/positron",
   center: [-73.9995, 40.7165],
-  zoom: 15.2,
+  zoom: 14,
   pitch: 0,
   bearing: 0,
   maxPitch: 0,
   attributionControl: false,
 });
 
+window.addUndocumentedFeature = function addUndocumentedFeature(feature) {
+  const source = map.getSource("undocumented");
+  if (!source) return;
+
+  if (feature?.properties && feature.properties.heat == null) {
+    feature.properties.heat = heatForCategory(
+      feature.properties.categoryKey,
+      feature.properties.kind
+    );
+  }
+
+  undocumentedData = {
+    type: "FeatureCollection",
+    features: [...undocumentedData.features, feature],
+  };
+  source.setData(undocumentedData);
+};
+
+window.resizeCareMap = function resizeCareMap() {
+  try {
+    map.resize();
+  } catch (_) {
+    /* map not ready */
+  }
+};
+
+window.applyHeatFilter = function applyHeatFilter(min, max) {
+  const lo = Math.min(min, max);
+  const hi = Math.max(min, max);
+  const filter = [
+    "all",
+    [">=", ["to-number", ["get", "heat"]], lo],
+    ["<=", ["to-number", ["get", "heat"]], hi],
+  ];
+
+  if (map.getLayer("seating-points")) {
+    map.setFilter("seating-points", filter);
+  }
+  if (map.getLayer("undocumented-points")) {
+    map.setFilter("undocumented-points", filter);
+  }
+};
+
 map.on("error", (e) => {
   console.error("Map error:", e.error || e);
 });
+
+window.addEventListener("resize", () => map.resize());
 
 function setPaint(id, prop, value) {
   try {
@@ -246,13 +385,18 @@ function scaleLineWidth(expr, factor) {
     return out;
   }
 
-  return expr.map((item) => scaleLineWidth(item, factor));
+  return expr;
 }
 
 function bindPointLayer(layerId) {
   map.on("click", layerId, (e) => {
     const feature = e.features?.[0];
     if (!feature) return;
+    // pass coords to form if panel is open, then still show popup
+    if (typeof window.onMapPickLocation === "function") {
+      window.onMapPickLocation(e.lngLat.lng, e.lngLat.lat);
+    }
+    e.originalEvent?.stopPropagation?.();
     showSeatPopup(feature.properties, e.point);
   });
 
@@ -265,10 +409,25 @@ function bindPointLayer(layerId) {
   });
 }
 
-map.on("load", async () => {
-  const style = map.getStyle();
+async function fetchText(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url} → ${res.status}`);
+  return res.text();
+}
 
-  for (const layer of style.layers) {
+async function fetchJson(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url} → ${res.status}`);
+  const raw = await res.text();
+  if (!raw) throw new Error(`${url} → empty response`);
+  return JSON.parse(raw);
+}
+
+map.on("load", async () => {
+  map.resize();
+
+  const style = map.getStyle();
+  for (const layer of style.layers || []) {
     const id = layer.id;
     const type = layer.type;
 
@@ -284,24 +443,40 @@ map.on("load", async () => {
         setPaint(id, "line-width", scaleLineWidth(width, LINE_SCALE));
       }
     } else if (type === "symbol") {
-      map.setLayoutProperty(id, "visibility", "none");
+      try {
+        map.setLayoutProperty(id, "visibility", "none");
+      } catch (_) {
+        /* ignore */
+      }
     }
   }
 
   try {
-    const [boundaryRes, seatsRes, undocRes] = await Promise.all([
-      fetch("data/chinatown.geojson"),
-      fetch("data/Seating_Locations_20260319.csv"),
-      fetch("data/0724_undocumented_seatings.csv"),
-    ]);
+    const boundary = await fetchJson("data/chinatown.geojson");
 
-    if (!boundaryRes.ok) throw new Error(`Failed to load boundary: ${boundaryRes.status}`);
-    if (!seatsRes.ok) throw new Error(`Failed to load seats: ${seatsRes.status}`);
-    if (!undocRes.ok) throw new Error(`Failed to load undocumented: ${undocRes.status}`);
+    let seats = { type: "FeatureCollection", features: [] };
+    let fieldUndoc = { type: "FeatureCollection", features: [] };
+    let community = { type: "FeatureCollection", features: [] };
 
-    const boundary = await boundaryRes.json();
-    const seats = documentedToGeoJSON(await seatsRes.text());
-    const undoc = undocumentedToGeoJSON(await undocRes.text());
+    try {
+      seats = documentedToGeoJSON(await fetchText("data/Seating_Locations_20260319.csv"));
+    } catch (err) {
+      console.error(err);
+    }
+
+    try {
+      fieldUndoc = undocumentedToGeoJSON(await fetchText("data/0724_undocumented_seatings.csv"));
+    } catch (err) {
+      console.error(err);
+    }
+
+    try {
+      community = communityToGeoJSON(await fetchText("data/community_seatings.csv"));
+    } catch (err) {
+      console.error(err);
+    }
+
+    undocumentedData = mergeFeatureCollections(fieldUndoc, community);
 
     map.addSource("seating", { type: "geojson", data: seats });
     map.addLayer({
@@ -315,26 +490,14 @@ map.on("load", async () => {
       },
     });
 
-    map.addSource("undocumented", { type: "geojson", data: undoc });
+    map.addSource("undocumented", { type: "geojson", data: undocumentedData });
     map.addLayer({
       id: "undocumented-points",
       type: "circle",
       source: "undocumented",
       paint: {
         "circle-radius": POINT_RADIUS,
-        "circle-color": [
-          "match",
-          ["get", "categoryKey"],
-          "staircase",
-          UNDOC_COLORS.staircase,
-          "small_infrastructure",
-          UNDOC_COLORS.small_infrastructure,
-          "floor",
-          UNDOC_COLORS.floor,
-          "portable_seating",
-          UNDOC_COLORS.portable_seating,
-          UNDOC_COLOR_DEFAULT,
-        ],
+        "circle-color": UNDOC_CIRCLE_COLOR,
         "circle-opacity": 0.95,
       },
     });
@@ -343,6 +506,13 @@ map.on("load", async () => {
     bindPointLayer("undocumented-points");
 
     map.on("click", (e) => {
+      if (
+        typeof window.onMapPickLocation === "function" &&
+        window.onMapPickLocation(e.lngLat.lng, e.lngLat.lat)
+      ) {
+        return;
+      }
+
       const hits = map.queryRenderedFeatures(e.point, {
         layers: ["seating-points", "undocumented-points"],
       });
@@ -373,6 +543,11 @@ map.on("load", async () => {
       duration: 0,
       bearing: 0,
     });
+
+    map.resize();
+    if (typeof window.applyHeatFilter === "function") {
+      window.applyHeatFilter(0, 4);
+    }
   } catch (err) {
     console.error(err);
   }

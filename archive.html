@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>archive — seating as care infrastructure</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link href="css/style.css" rel="stylesheet" />
+  </head>
+  <body class="page-archive">
+    <main class="archive-main">
+      <section class="archive" aria-label="seating archive">
+        <header class="archive__head">
+          <label class="archive__filter">
+            <span class="archive__filter-label">type</span>
+            <select id="filter-type" aria-label="filter by type">
+              <option value="all">all</option>
+            </select>
+          </label>
+          <label class="archive__filter">
+            <span class="archive__filter-label">category</span>
+            <select id="filter-category" aria-label="filter by category">
+              <option value="all">all</option>
+            </select>
+          </label>
+          <span>lng / lat</span>
+          <span>installed date</span>
+          <span>observed date</span>
+        </header>
+        <div class="archive__list" id="archive-list">
+          <p class="archive__status">loading…</p>
+        </div>
+      </section>
+    </main>
+
+    <div class="sidebar sidebar--archive">
+      <h1 class="site-title">
+        undocumented sittings:<br />
+        infrastructure for care
+      </h1>
+
+      <nav class="dock" aria-label="views">
+        <button type="button" class="dock__tab" data-view="history">
+          history
+        </button>
+        <a class="dock__tab" data-view="map" href="index.html">map</a>
+        <a class="dock__tab is-active" data-view="archive" href="archive.html"
+          >archive</a
+        >
+      </nav>
+    </div>
+
+    <script src="js/archive.js"></script>
+  </body>
+</html>

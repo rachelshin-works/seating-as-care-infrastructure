@@ -14,13 +14,52 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap"
       rel="stylesheet"
     />
-    <link href="style.css" rel="stylesheet" />
+    <link href="css/style.css" rel="stylesheet" />
   </head>
   <body>
     <div id="map"></div>
 
-    <aside class="seat-popup is-hidden" id="seat-popup" hidden aria-label="seat details">
-      <button type="button" class="seat-popup__close" aria-label="close">×</button>
+    <aside class="heat-legend" aria-label="color range filter">
+      <div class="heat-legend__labels">
+        <span>documented</span>
+        <span>undocumented</span>
+      </div>
+      <div class="heat-legend__bar" aria-hidden="true"></div>
+      <div class="heat-legend__slider">
+        <input
+          type="range"
+          id="heat-min"
+          min="0"
+          max="4"
+          step="1"
+          value="0"
+          aria-label="range min"
+        />
+        <input
+          type="range"
+          id="heat-max"
+          min="0"
+          max="4"
+          step="1"
+          value="4"
+          aria-label="range max"
+        />
+      </div>
+      <div class="heat-legend__values">
+        <span id="heat-min-label"></span>
+        <span id="heat-max-label"></span>
+      </div>
+    </aside>
+
+    <aside
+      class="seat-popup is-hidden"
+      id="seat-popup"
+      hidden
+      aria-label="seat details"
+    >
+      <button type="button" class="seat-popup__close" aria-label="close">
+        ×
+      </button>
       <dl class="seat-popup__list">
         <div class="seat-popup__row">
           <dt>type</dt>
@@ -52,41 +91,47 @@
       </h1>
 
       <aside
-        class="panel is-hidden"
+        class="panel"
         id="map-panel"
         aria-label="sitting survey form"
-        hidden
       >
         <header class="panel__header">
           <h2 class="panel__title">collective map</h2>
-          <button type="button" class="panel__close" aria-label="close">
-            ×
+          <button type="button" class="panel__close" aria-label="minimize">
+            −
           </button>
         </header>
 
-        <form class="panel__form" onsubmit="return false;">
+        <form class="panel__form" id="seat-form">
           <div class="field-row">
             <label class="field">
               <span class="field__label">lng</span>
               <input
                 class="field__input"
+                id="field-lng"
+                name="longitude"
                 type="text"
-                value="-73.99821"
-                readonly
-                tabindex="-1"
+                inputmode="decimal"
+                placeholder="click map or locate"
+                value=""
               />
             </label>
             <label class="field">
               <span class="field__label">lat</span>
               <input
                 class="field__input"
+                id="field-lat"
+                name="latitude"
                 type="text"
-                value="40.71584"
-                readonly
-                tabindex="-1"
+                inputmode="decimal"
+                placeholder="click map or locate"
+                value=""
               />
             </label>
           </div>
+          <button type="button" class="locate-btn" id="locate-btn">
+            locate me
+          </button>
 
           <fieldset class="field">
             <legend class="field__label">category</legend>
@@ -161,28 +206,49 @@
             <span class="field__label">comment</span>
             <textarea
               class="field__textarea"
+              id="field-comment"
+              name="comment"
               rows="4"
               placeholder="describe the sitting condition…"
             ></textarea>
           </label>
 
+          <p class="form-status" id="form-status" aria-live="polite"></p>
           <button class="submit" type="submit">submit</button>
         </form>
       </aside>
+
+      <button
+        type="button"
+        class="panel-chip is-hidden"
+        id="panel-chip"
+        aria-label="expand collective map"
+        hidden
+      >
+        <span>collective map</span>
+        <span class="panel-chip__arrow" aria-hidden="true">→</span>
+      </button>
 
       <nav class="dock" aria-label="views">
         <button type="button" class="dock__tab" data-view="history">
           history
         </button>
-        <button type="button" class="dock__tab" data-view="map">map</button>
-        <button type="button" class="dock__tab" data-view="archive">
-          archive
+        <button type="button" class="dock__tab is-active" data-view="map">
+          map
         </button>
+        <a class="dock__tab" data-view="archive" href="archive.html">archive</a>
       </nav>
     </div>
 
     <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-    <script src="map.js"></script>
-    <script src="ui.js"></script>
+    <script>
+      if (typeof maplibregl === "undefined") {
+        document.write(
+          '<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"><\/script>',
+        );
+      }
+    </script>
+    <script src="js/map.js"></script>
+    <script src="js/ui.js"></script>
   </body>
 </html>
