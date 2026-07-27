@@ -4,6 +4,185 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>seating as care infrastructure</title>
+    <link
+      href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
+      rel="stylesheet"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link href="style.css" rel="stylesheet" />
   </head>
-  <body></body>
+  <body>
+    <div id="map"></div>
+
+    <aside class="seat-popup is-hidden" id="seat-popup" hidden aria-label="seat details">
+      <button type="button" class="seat-popup__close" aria-label="close">×</button>
+      <dl class="seat-popup__list">
+        <div class="seat-popup__row">
+          <dt>type</dt>
+          <dd id="seat-popup-type">—</dd>
+        </div>
+        <div class="seat-popup__row">
+          <dt id="seat-popup-category-label">bench</dt>
+          <dd id="seat-popup-category">—</dd>
+        </div>
+        <div class="seat-popup__row">
+          <dt>lng</dt>
+          <dd id="seat-popup-lng">—</dd>
+        </div>
+        <div class="seat-popup__row">
+          <dt>lat</dt>
+          <dd id="seat-popup-lat">—</dd>
+        </div>
+        <div class="seat-popup__row">
+          <dt id="seat-popup-date-label">installed date</dt>
+          <dd id="seat-popup-date">—</dd>
+        </div>
+      </dl>
+    </aside>
+
+    <div class="sidebar">
+      <h1 class="site-title">
+        undocumented sittings:<br />
+        infrastructure for care
+      </h1>
+
+      <aside
+        class="panel is-hidden"
+        id="map-panel"
+        aria-label="sitting survey form"
+        hidden
+      >
+        <header class="panel__header">
+          <h2 class="panel__title">collective map</h2>
+          <button type="button" class="panel__close" aria-label="close">
+            ×
+          </button>
+        </header>
+
+        <form class="panel__form" onsubmit="return false;">
+          <div class="field-row">
+            <label class="field">
+              <span class="field__label">lng</span>
+              <input
+                class="field__input"
+                type="text"
+                value="-73.99821"
+                readonly
+                tabindex="-1"
+              />
+            </label>
+            <label class="field">
+              <span class="field__label">lat</span>
+              <input
+                class="field__input"
+                type="text"
+                value="40.71584"
+                readonly
+                tabindex="-1"
+              />
+            </label>
+          </div>
+
+          <fieldset class="field">
+            <legend class="field__label">category</legend>
+            <div class="tabs">
+              <label class="tab">
+                <input
+                  type="radio"
+                  name="category"
+                  value="portable-chair"
+                  checked
+                />
+                <span>portable chair</span>
+              </label>
+              <label class="tab">
+                <input type="radio" name="category" value="staircase" />
+                <span>staircase</span>
+              </label>
+              <label class="tab">
+                <input
+                  type="radio"
+                  name="category"
+                  value="building-infrastructures"
+                />
+                <span>building infrastructures</span>
+              </label>
+              <label class="tab">
+                <input
+                  type="radio"
+                  name="category"
+                  value="building-scaffolding"
+                />
+                <span>building scaffolding</span>
+              </label>
+              <label class="tab">
+                <input type="radio" name="category" value="cars" />
+                <span>cars</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="field">
+            <legend class="field__label">rate</legend>
+            <div class="rate">
+              <label class="rate__option">
+                <input type="radio" name="rate" value="0" />
+                <span>0</span>
+              </label>
+              <label class="rate__option">
+                <input type="radio" name="rate" value="1" />
+                <span>1</span>
+              </label>
+              <label class="rate__option">
+                <input type="radio" name="rate" value="2" checked />
+                <span>2</span>
+              </label>
+              <label class="rate__option">
+                <input type="radio" name="rate" value="3" />
+                <span>3</span>
+              </label>
+              <label class="rate__option">
+                <input type="radio" name="rate" value="4" />
+                <span>4</span>
+              </label>
+              <label class="rate__option">
+                <input type="radio" name="rate" value="5" />
+                <span>5</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <label class="field field--grow">
+            <span class="field__label">comment</span>
+            <textarea
+              class="field__textarea"
+              rows="4"
+              placeholder="describe the sitting condition…"
+            ></textarea>
+          </label>
+
+          <button class="submit" type="submit">submit</button>
+        </form>
+      </aside>
+
+      <nav class="dock" aria-label="views">
+        <button type="button" class="dock__tab" data-view="history">
+          history
+        </button>
+        <button type="button" class="dock__tab" data-view="map">map</button>
+        <button type="button" class="dock__tab" data-view="archive">
+          archive
+        </button>
+      </nav>
+    </div>
+
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <script src="map.js"></script>
+    <script src="ui.js"></script>
+  </body>
 </html>
