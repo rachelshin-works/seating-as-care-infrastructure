@@ -17,3 +17,6 @@ Thumbs.db
 # logs
 *.log
 npm-debug.log*
+
+# large source 3d assets (runtime uses assets/model-line.glb)
+assets/TR16miUSzq2L9oNuVKUMq.glb

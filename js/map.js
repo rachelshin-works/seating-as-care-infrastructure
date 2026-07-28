@@ -1,4 +1,4 @@
-const LINE = "#00ECF0";
+const LINE = "#00DDE0";
 const PAPER = "#ffffff";
 const SEAT_COLOR = "#D4D4D4";
 const UNDOC_COLORS = {
@@ -204,7 +204,7 @@ const seatPopupDateLabel = document.getElementById("seat-popup-date-label");
 const seatPopupDate = document.getElementById("seat-popup-date");
 const seatPopupClose = document.querySelector(".seat-popup__close");
 
-function showSeatPopup(props, point) {
+function showSeatPopup(props, point, lngLat) {
   const isUndoc = props.kind === "undocumented";
 
   seatPopupType.textContent = isUndoc ? "undocumented" : "documented";
@@ -217,6 +217,22 @@ function showSeatPopup(props, point) {
 
   seatPopup.hidden = false;
   seatPopup.classList.remove("is-hidden");
+
+  if (lngLat && map.getSource("selected-point")) {
+    map.getSource("selected-point").setData({
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [lngLat.lng, lngLat.lat],
+          },
+          properties: {},
+        },
+      ],
+    });
+  }
 
   const offset = 14;
   const mapRect = map.getContainer().getBoundingClientRect();
@@ -245,6 +261,12 @@ function showSeatPopup(props, point) {
 function hideSeatPopup() {
   seatPopup.classList.add("is-hidden");
   seatPopup.hidden = true;
+  if (map.getSource("selected-point")) {
+    map.getSource("selected-point").setData({
+      type: "FeatureCollection",
+      features: [],
+    });
+  }
 }
 
 seatPopupClose?.addEventListener("click", hideSeatPopup);
@@ -326,21 +348,47 @@ window.resizeCareMap = function resizeCareMap() {
   }
 };
 
-window.applyHeatFilter = function applyHeatFilter(min, max) {
-  const lo = Math.min(min, max);
-  const hi = Math.max(min, max);
-  const filter = [
-    "all",
-    [">=", ["to-number", ["get", "heat"]], lo],
-    ["<=", ["to-number", ["get", "heat"]], hi],
-  ];
+window.applyAxesFilter = function applyAxesFilter(selected) {
+  const active = new Set(selected);
 
   if (map.getLayer("seating-points")) {
-    map.setFilter("seating-points", filter);
+    map.setFilter(
+      "seating-points",
+      active.has("doc-public") ? null : ["==", ["get", "kind"], "__none__"]
+    );
   }
+
   if (map.getLayer("undocumented-points")) {
-    map.setFilter("undocumented-points", filter);
+    const cats = [];
+    if (active.has("undoc-individual")) {
+      cats.push(
+        "portable_seating",
+        "small_infrastructure",
+        "floor",
+        "cars",
+        "building_infrastructures",
+        "building_scaffolding"
+      );
+    }
+    if (active.has("undoc-public")) {
+      cats.push("staircase");
+    }
+
+    if (!cats.length) {
+      map.setFilter("undocumented-points", ["==", ["get", "kind"], "__none__"]);
+    } else {
+      map.setFilter("undocumented-points", [
+        "in",
+        ["get", "categoryKey"],
+        ["literal", cats],
+      ]);
+    }
   }
+};
+
+// keep old name as alias during transition
+window.applyHeatFilter = function applyHeatFilter() {
+  window.applyAxesFilter?.(["doc-public", "undoc-individual", "undoc-public"]);
 };
 
 map.on("error", (e) => {
@@ -397,7 +445,7 @@ function bindPointLayer(layerId) {
       window.onMapPickLocation(e.lngLat.lng, e.lngLat.lat);
     }
     e.originalEvent?.stopPropagation?.();
-    showSeatPopup(feature.properties, e.point);
+    showSeatPopup(feature.properties, e.point, e.lngLat);
   });
 
   map.on("mouseenter", layerId, () => {
@@ -487,6 +535,7 @@ map.on("load", async () => {
         "circle-radius": POINT_RADIUS,
         "circle-color": SEAT_COLOR,
         "circle-opacity": 0.9,
+        "circle-stroke-width": 0,
       },
     });
 
@@ -499,8 +548,42 @@ map.on("load", async () => {
         "circle-radius": POINT_RADIUS,
         "circle-color": UNDOC_CIRCLE_COLOR,
         "circle-opacity": 0.95,
+        "circle-stroke-width": 0,
       },
     });
+
+    // mint outer glow only — original point color stays on seating/undocumented layers
+    map.addSource("selected-point", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+    });
+    map.addLayer(
+      {
+        id: "selected-point-glow",
+        type: "circle",
+        source: "selected-point",
+        paint: {
+          "circle-radius": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            10,
+            10,
+            13,
+            16,
+            16,
+            24,
+            18,
+            32,
+          ],
+          "circle-color": LINE,
+          "circle-opacity": 0.35,
+          "circle-blur": 0.9,
+          "circle-stroke-width": 0,
+        },
+      },
+      "seating-points"
+    );
 
     bindPointLayer("seating-points");
     bindPointLayer("undocumented-points");
@@ -545,8 +628,8 @@ map.on("load", async () => {
     });
 
     map.resize();
-    if (typeof window.applyHeatFilter === "function") {
-      window.applyHeatFilter(0, 4);
+    if (typeof window.applyAxesFilter === "function") {
+      window.applyAxesFilter(["doc-public", "undoc-individual", "undoc-public"]);
     }
   } catch (err) {
     console.error(err);

@@ -19,35 +19,54 @@
   <body>
     <div id="map"></div>
 
-    <aside class="heat-legend" aria-label="color range filter">
-      <div class="heat-legend__labels">
-        <span>documented</span>
-        <span>undocumented</span>
-      </div>
-      <div class="heat-legend__bar" aria-hidden="true"></div>
-      <div class="heat-legend__slider">
-        <input
-          type="range"
-          id="heat-min"
-          min="0"
-          max="4"
-          step="1"
-          value="0"
-          aria-label="range min"
-        />
-        <input
-          type="range"
-          id="heat-max"
-          min="0"
-          max="4"
-          step="1"
-          value="4"
-          aria-label="range max"
-        />
-      </div>
-      <div class="heat-legend__values">
-        <span id="heat-min-label"></span>
-        <span id="heat-max-label"></span>
+    <aside class="axes-filter" aria-label="two axes filter">
+      <div class="axes-filter__layout">
+        <span class="axes-filter__blank" aria-hidden="true"></span>
+        <span class="axes-filter__x-label">individual</span>
+        <span class="axes-filter__x-label">public</span>
+
+        <span class="axes-filter__y-label">documented</span>
+        <button
+          type="button"
+          class="axes-filter__cell is-disabled"
+          disabled
+          aria-label="documented individual — none"
+          title="none"
+        >
+          <span class="axes-filter__swatch"></span>
+        </button>
+        <button
+          type="button"
+          class="axes-filter__cell is-active"
+          data-cell="doc-public"
+          aria-pressed="true"
+          aria-label="documented public — benches"
+          title="documented benches"
+        >
+          <span class="axes-filter__swatch axes-filter__swatch--grey"></span>
+        </button>
+
+        <span class="axes-filter__y-label">undocumented</span>
+        <button
+          type="button"
+          class="axes-filter__cell is-active"
+          data-cell="undoc-individual"
+          aria-pressed="true"
+          aria-label="undocumented individual — portable chairs, small infrastructure"
+          title="portable chairs, small infrastructure"
+        >
+          <span class="axes-filter__swatch axes-filter__swatch--warm"></span>
+        </button>
+        <button
+          type="button"
+          class="axes-filter__cell is-active"
+          data-cell="undoc-public"
+          aria-pressed="true"
+          aria-label="undocumented public — staircase"
+          title="staircase"
+        >
+          <span class="axes-filter__swatch axes-filter__swatch--hot"></span>
+        </button>
       </div>
     </aside>
 
@@ -230,9 +249,7 @@
       </button>
 
       <nav class="dock" aria-label="views">
-        <button type="button" class="dock__tab" data-view="history">
-          history
-        </button>
+        <a class="dock__tab" data-view="history" href="history.html">history</a>
         <button type="button" class="dock__tab is-active" data-view="map">
           map
         </button>

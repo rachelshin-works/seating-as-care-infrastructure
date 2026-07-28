@@ -113,7 +113,7 @@ dock.addEventListener("click", (e) => {
   const tab = e.target.closest(".dock__tab");
   if (!tab) return;
 
-  if (tab.dataset.view === "archive") {
+  if (tab.dataset.view === "archive" || tab.dataset.view === "history") {
     return;
   }
 
@@ -199,29 +199,28 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
-/* color-range filter */
-const heatMin = document.getElementById("heat-min");
-const heatMax = document.getElementById("heat-max");
-const heatMinLabel = document.getElementById("heat-min-label");
-const heatMaxLabel = document.getElementById("heat-max-label");
+/* two-axes filter */
+const axesFilter = document.querySelector(".axes-filter");
 
-function syncHeatSlider() {
-  let min = Number(heatMin.value);
-  let max = Number(heatMax.value);
-  if (min > max) {
-    [min, max] = [max, min];
-    heatMin.value = min;
-    heatMax.value = max;
-  }
-  heatMinLabel.textContent = String(min);
-  heatMaxLabel.textContent = String(max);
-  if (typeof window.applyHeatFilter === "function") {
-    window.applyHeatFilter(min, max);
+function syncAxesFilter() {
+  if (!axesFilter) return;
+  const selected = [...axesFilter.querySelectorAll(".axes-filter__cell.is-active")]
+    .map((btn) => btn.dataset.cell)
+    .filter(Boolean);
+  if (typeof window.applyAxesFilter === "function") {
+    window.applyAxesFilter(selected);
   }
 }
 
-heatMin?.addEventListener("input", syncHeatSlider);
-heatMax?.addEventListener("input", syncHeatSlider);
+axesFilter?.addEventListener("click", (e) => {
+  const cell = e.target.closest(".axes-filter__cell");
+  if (!cell || cell.disabled) return;
+  cell.classList.toggle("is-active");
+  cell.setAttribute("aria-pressed", cell.classList.contains("is-active") ? "true" : "false");
+  syncAxesFilter();
+});
+
+syncAxesFilter();
 
 /* open by default */
 syncPanelChipWidth();

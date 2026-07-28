@@ -245,11 +245,3 @@ async function fetchText(url) {
     root.innerHTML = `<p class="archive__status">${escapeHtml(err.message)}</p>`;
   }
 })();
-
-document.querySelector(".dock")?.addEventListener("click", (e) => {
-  const tab = e.target.closest("[data-view]");
-  if (!tab) return;
-  if (tab.dataset.view === "history") {
-    e.preventDefault();
-  }
-});
