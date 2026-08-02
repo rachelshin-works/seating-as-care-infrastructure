@@ -5,7 +5,7 @@ const canvas = document.getElementById("line-model");
 if (!canvas) {
   console.warn("[line-model] #line-model canvas missing");
 } else {
-  const LINE_COLOR = 0x00dde0;
+  const LINE_COLOR = 0x01e1e5;
   const MODEL_URL = "assets/model-line.glb";
 
   const renderer = new THREE.WebGLRenderer({

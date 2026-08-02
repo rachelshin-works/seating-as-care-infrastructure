@@ -4,17 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>seating as care infrastructure</title>
+    <style>
+      html,
+      body {
+        background: #ffffff;
+        color: #01E1E5;
+      }
+    </style>
+    <link href="css/style.css" rel="stylesheet" />
     <link
       href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
       rel="stylesheet"
     />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
-    <link href="css/style.css" rel="stylesheet" />
   </head>
   <body>
     <div id="map"></div>
@@ -105,14 +106,17 @@
 
     <div class="sidebar">
       <h1 class="site-title">
-        undocumented sittings:<br />
-        infrastructure for care
+        <img
+          src="assets/title.png"
+          alt="undocumented sittings: infrastructure for care"
+        />
       </h1>
 
       <aside
-        class="panel"
+        class="panel is-hidden"
         id="map-panel"
         aria-label="sitting survey form"
+        hidden
       >
         <header class="panel__header">
           <h2 class="panel__title">collective map</h2>
@@ -239,10 +243,9 @@
 
       <button
         type="button"
-        class="panel-chip is-hidden"
+        class="panel-chip"
         id="panel-chip"
         aria-label="expand collective map"
-        hidden
       >
         <span>collective map</span>
         <span class="panel-chip__arrow" aria-hidden="true">→</span>

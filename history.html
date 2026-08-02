@@ -4,13 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>history — seating as care infrastructure</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
+    <style>
+      html,
+      body {
+        background: #ffffff;
+        color: #01E1E5;
+      }
+    </style>
     <link href="css/style.css" rel="stylesheet" />
+    <!-- temporarily hide chair line model
     <script type="importmap">
       {
         "imports": {
@@ -19,22 +21,30 @@
         }
       }
     </script>
+    -->
   </head>
   <body class="page-history">
+    <!-- temporarily hide chair line model
     <div class="line-model-wrap" aria-hidden="true">
       <canvas id="line-model"></canvas>
     </div>
+    -->
 
     <main class="history-main">
       <article class="history" id="history-content" aria-label="history writing">
         <p class="history__status">loading…</p>
       </article>
+      <footer class="history__footer">
+        26Summer CDP GSAPP Columbia University | Colloquium I | hebin rachel shin
+      </footer>
     </main>
 
     <div class="sidebar sidebar--fixed">
       <h1 class="site-title">
-        undocumented sittings:<br />
-        infrastructure for care
+        <img
+          src="assets/title.png"
+          alt="undocumented sittings: infrastructure for care"
+        />
       </h1>
 
       <nav class="dock" aria-label="views">
@@ -46,7 +56,7 @@
       </nav>
     </div>
 
-    <script type="module" src="js/line-model.js"></script>
+    <!-- <script type="module" src="js/line-model.js"></script> -->
     <script src="js/history.js"></script>
   </body>
 </html>

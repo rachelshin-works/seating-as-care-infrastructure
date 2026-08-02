@@ -1,4 +1,4 @@
-const LINE = "#00DDE0";
+const LINE = "#01E1E5";
 const PAPER = "#ffffff";
 const SEAT_COLOR = "#D4D4D4";
 const UNDOC_COLORS = {
@@ -204,6 +204,31 @@ const seatPopupDateLabel = document.getElementById("seat-popup-date-label");
 const seatPopupDate = document.getElementById("seat-popup-date");
 const seatPopupClose = document.querySelector(".seat-popup__close");
 
+function setSelectedPointGlow(lng, lat) {
+  if (!map.getSource("selected-point")) return;
+  map.getSource("selected-point").setData({
+    type: "FeatureCollection",
+    features: [
+      {
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [Number(lng), Number(lat)],
+        },
+        properties: {},
+      },
+    ],
+  });
+}
+
+function clearSelectedPointGlow() {
+  if (!map.getSource("selected-point")) return;
+  map.getSource("selected-point").setData({
+    type: "FeatureCollection",
+    features: [],
+  });
+}
+
 function showSeatPopup(props, point, lngLat) {
   const isUndoc = props.kind === "undocumented";
 
@@ -218,21 +243,7 @@ function showSeatPopup(props, point, lngLat) {
   seatPopup.hidden = false;
   seatPopup.classList.remove("is-hidden");
 
-  if (lngLat && map.getSource("selected-point")) {
-    map.getSource("selected-point").setData({
-      type: "FeatureCollection",
-      features: [
-        {
-          type: "Feature",
-          geometry: {
-            type: "Point",
-            coordinates: [lngLat.lng, lngLat.lat],
-          },
-          properties: {},
-        },
-      ],
-    });
-  }
+  if (lngLat) setSelectedPointGlow(lngLat.lng, lngLat.lat);
 
   const offset = 14;
   const mapRect = map.getContainer().getBoundingClientRect();
@@ -261,12 +272,7 @@ function showSeatPopup(props, point, lngLat) {
 function hideSeatPopup() {
   seatPopup.classList.add("is-hidden");
   seatPopup.hidden = true;
-  if (map.getSource("selected-point")) {
-    map.getSource("selected-point").setData({
-      type: "FeatureCollection",
-      features: [],
-    });
-  }
+  // keep mint pick marker visible even after the popup closes
 }
 
 seatPopupClose?.addEventListener("click", hideSeatPopup);
@@ -440,12 +446,22 @@ function bindPointLayer(layerId) {
   map.on("click", layerId, (e) => {
     const feature = e.features?.[0];
     if (!feature) return;
-    // pass coords to form if panel is open, then still show popup
-    if (typeof window.onMapPickLocation === "function") {
-      window.onMapPickLocation(e.lngLat.lng, e.lngLat.lat);
-    }
     e.originalEvent?.stopPropagation?.();
+
+    // if the form is open, fill coords + pan/glow; still show the seat popup
+    const picking =
+      typeof window.onMapPickLocation === "function" &&
+      window.onMapPickLocation(e.lngLat.lng, e.lngLat.lat);
+
     showSeatPopup(feature.properties, e.point, e.lngLat);
+
+    // picking already eased the map; for browse-only, gently center the seat
+    if (!picking) {
+      map.easeTo({
+        center: [e.lngLat.lng, e.lngLat.lat],
+        duration: 500,
+      });
+    }
   });
 
   map.on("mouseenter", layerId, () => {
@@ -552,38 +568,58 @@ map.on("load", async () => {
       },
     });
 
-    // mint outer glow only — original point color stays on seating/undocumented layers
+    // mint glow + core for selected / picked points
     map.addSource("selected-point", {
       type: "geojson",
       data: { type: "FeatureCollection", features: [] },
     });
-    map.addLayer(
-      {
-        id: "selected-point-glow",
-        type: "circle",
-        source: "selected-point",
-        paint: {
-          "circle-radius": [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            10,
-            10,
-            13,
-            16,
-            16,
-            24,
-            18,
-            32,
-          ],
-          "circle-color": LINE,
-          "circle-opacity": 0.35,
-          "circle-blur": 0.9,
-          "circle-stroke-width": 0,
-        },
+    map.addLayer({
+      id: "selected-point-glow",
+      type: "circle",
+      source: "selected-point",
+      paint: {
+        "circle-radius": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          10,
+          8.4,
+          13,
+          14,
+          16,
+          21,
+          18,
+          28,
+        ],
+        "circle-color": LINE,
+        "circle-opacity": 0.4,
+        "circle-blur": 0.85,
+        "circle-stroke-width": 0,
       },
-      "seating-points"
-    );
+    });
+    map.addLayer({
+      id: "selected-point-core",
+      type: "circle",
+      source: "selected-point",
+      paint: {
+        "circle-radius": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          10,
+          2.1,
+          13,
+          3.5,
+          16,
+          5.6,
+          18,
+          7.7,
+        ],
+        "circle-color": LINE,
+        "circle-opacity": 0.95,
+        "circle-stroke-width": 0,
+      },
+    });
 
     bindPointLayer("seating-points");
     bindPointLayer("undocumented-points");
@@ -601,6 +637,28 @@ map.on("load", async () => {
       });
       if (!hits.length) hideSeatPopup();
     });
+
+    window.focusMapLocation = function focusMapLocation(lng, lat) {
+      const coordinates = [Number(lng), Number(lat)];
+      if (!Number.isFinite(coordinates[0]) || !Number.isFinite(coordinates[1])) {
+        return;
+      }
+
+      // close info popup UI without clearing the pick glow
+      seatPopup.classList.add("is-hidden");
+      seatPopup.hidden = true;
+      setSelectedPointGlow(coordinates[0], coordinates[1]);
+
+      const mobile = window.matchMedia("(max-width: 720px)").matches;
+      map.easeTo({
+        center: coordinates,
+        zoom: Math.max(map.getZoom(), mobile ? 16 : 15.5),
+        duration: 750,
+        padding: mobile
+          ? { top: 48, bottom: 120, left: 24, right: 24 }
+          : { top: 80, bottom: 80, left: 80, right: 300 },
+      });
+    };
 
     map.addSource("chinatown", { type: "geojson", data: boundary });
     map.addLayer({

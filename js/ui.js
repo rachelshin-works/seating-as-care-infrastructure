@@ -24,6 +24,9 @@ function setCoords(lng, lat, source = "gps") {
   lngInput.value = Number(lng).toFixed(6);
   latInput.value = Number(lat).toFixed(6);
   setStatus(`location ready (${source})`);
+  if (typeof window.focusMapLocation === "function") {
+    window.focusMapLocation(lng, lat);
+  }
 }
 
 function expandMapPanel() {
@@ -44,6 +47,7 @@ function collapseMapPanel() {
   panelChip.classList.remove("is-hidden");
   pickOnMap = false;
   setStatus("");
+  // keep map pick marker visible while the panel is closed
 }
 
 function openMapPanel() {
@@ -129,8 +133,17 @@ locateBtn.addEventListener("click", requestLocation);
 window.addEventListener("resize", syncPanelChipWidth);
 
 window.onMapPickLocation = function onMapPickLocation(lng, lat) {
-  if (!pickOnMap || panel.hidden) return false;
-  setCoords(lng, lat, "map");
+  // always drop/move the mint marker, even when collective map is closed
+  if (typeof window.focusMapLocation === "function") {
+    window.focusMapLocation(lng, lat);
+  }
+
+  if (!panel.hidden && pickOnMap) {
+    lngInput.value = Number(lng).toFixed(6);
+    latInput.value = Number(lat).toFixed(6);
+    setStatus("location ready (map)");
+  }
+
   return true;
 };
 
@@ -222,6 +235,10 @@ axesFilter?.addEventListener("click", (e) => {
 
 syncAxesFilter();
 
-/* open by default */
+/* open by default on desktop; collapsed on mobile */
 syncPanelChipWidth();
-openMapPanel();
+if (window.matchMedia("(max-width: 720px)").matches) {
+  collapseMapPanel();
+} else {
+  openMapPanel();
+}
