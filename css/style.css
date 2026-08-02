@@ -983,7 +983,6 @@ html:has(body.page-history) {
   display: block;
   height: var(--fig-h);
   width: auto;
-  vertical-align: top;
   transition: filter 0.22s ease;
 }
 
