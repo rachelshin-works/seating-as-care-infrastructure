@@ -1,10 +1,7 @@
-const express = require("express");
 const fs = require("fs");
 const path = require("path");
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-const CSV_PATH = path.join(__dirname, "data", "community_seatings.csv");
+const CSV_PATH = path.join(process.cwd(), "data", "community_seatings.csv");
 const HEADER = "longitude,latitude,category,rate,comment,observed_date\n";
 
 const CATEGORY_MAP = {
@@ -57,12 +54,13 @@ function toFeature({ longitude, latitude, category, rate, comment, observed_date
   };
 }
 
-ensureCsv();
+module.exports = async function handler(req, res) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ error: "method not allowed" });
+  }
 
-app.use(express.json({ limit: "32kb" }));
-
-app.post("/api/seatings", (req, res) => {
-  const body = req.body || {};
+  const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
   const lng = parseFloat(body.longitude);
   const lat = parseFloat(body.latitude);
   const rawCategory = String(body.category || "").trim();
@@ -88,6 +86,7 @@ app.post("/api/seatings", (req, res) => {
   ].join(",");
 
   try {
+    // Vercel serverless filesystem is ephemeral; writes may not persist across deploys.
     ensureCsv();
     fs.appendFileSync(CSV_PATH, `${line}\n`, "utf8");
     const feature = toFeature({
@@ -103,10 +102,4 @@ app.post("/api/seatings", (req, res) => {
     console.error(err);
     return res.status(500).json({ error: "failed to write csv" });
   }
-});
-
-app.use(express.static(__dirname));
-
-app.listen(PORT, () => {
-  console.log(`server running at http://localhost:${PORT}`);
-});
+};
