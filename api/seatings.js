@@ -1,8 +1,7 @@
-const fs = require("fs");
-const path = require("path");
-
-const CSV_PATH = path.join(process.cwd(), "data", "community_seatings.csv");
-const HEADER = "longitude,latitude,category,rate,comment,observed_date\n";
+const {
+  readCsv,
+  appendLine,
+} = require("../lib/community-store");
 
 const CATEGORY_MAP = {
   "portable-chair": "portable_seating",
@@ -11,12 +10,6 @@ const CATEGORY_MAP = {
   "building-scaffolding": "building_scaffolding",
   cars: "cars",
 };
-
-function ensureCsv() {
-  if (!fs.existsSync(CSV_PATH)) {
-    fs.writeFileSync(CSV_PATH, HEADER, "utf8");
-  }
-}
 
 function csvEscape(value) {
   const str = String(value ?? "");
@@ -55,12 +48,41 @@ function toFeature({ longitude, latitude, category, rate, comment, observed_date
 }
 
 module.exports = async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+
+  if (req.method === "GET") {
+    try {
+      const csv = await readCsv();
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).send(csv);
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "failed to read csv" });
+    }
+  }
+
   if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
+    res.setHeader("Allow", "GET, POST");
     return res.status(405).json({ error: "method not allowed" });
   }
 
-  const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
+  let body = req.body;
+  if (typeof body === "string") {
+    try {
+      body = JSON.parse(body || "{}");
+    } catch (_) {
+      return res.status(400).json({ error: "invalid json body" });
+    }
+  }
+  body = body || {};
+
   const lng = parseFloat(body.longitude);
   const lat = parseFloat(body.latitude);
   const rawCategory = String(body.category || "").trim();
@@ -86,9 +108,7 @@ module.exports = async function handler(req, res) {
   ].join(",");
 
   try {
-    // Vercel serverless filesystem is ephemeral; writes may not persist across deploys.
-    ensureCsv();
-    fs.appendFileSync(CSV_PATH, `${line}\n`, "utf8");
+    await appendLine(line);
     const feature = toFeature({
       longitude: lng,
       latitude: lat,
@@ -100,6 +120,13 @@ module.exports = async function handler(req, res) {
     return res.status(201).json({ ok: true, feature });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: "failed to write csv" });
+    const missingToken =
+      !process.env.GITHUB_TOKEN &&
+      /EROFS|read-only|EACCES|ENOENT|Vercel cannot write/i.test(String(err.message));
+    return res.status(500).json({
+      error: missingToken
+        ? "set GITHUB_TOKEN in Vercel project env vars"
+        : "failed to write csv",
+    });
   }
 };

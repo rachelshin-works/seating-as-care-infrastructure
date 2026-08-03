@@ -1,11 +1,9 @@
 const express = require("express");
-const fs = require("fs");
 const path = require("path");
+const { readCsv, appendLine } = require("./lib/community-store");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const CSV_PATH = path.join(__dirname, "data", "community_seatings.csv");
-const HEADER = "longitude,latitude,category,rate,comment,observed_date\n";
 
 const CATEGORY_MAP = {
   "portable-chair": "portable_seating",
@@ -14,12 +12,6 @@ const CATEGORY_MAP = {
   "building-scaffolding": "building_scaffolding",
   cars: "cars",
 };
-
-function ensureCsv() {
-  if (!fs.existsSync(CSV_PATH)) {
-    fs.writeFileSync(CSV_PATH, HEADER, "utf8");
-  }
-}
 
 function csvEscape(value) {
   const str = String(value ?? "");
@@ -57,11 +49,21 @@ function toFeature({ longitude, latitude, category, rate, comment, observed_date
   };
 }
 
-ensureCsv();
-
 app.use(express.json({ limit: "32kb" }));
 
-app.post("/api/seatings", (req, res) => {
+app.get("/api/seatings", async (_req, res) => {
+  try {
+    const csv = await readCsv();
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(200).send(csv);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "failed to read csv" });
+  }
+});
+
+app.post("/api/seatings", async (req, res) => {
   const body = req.body || {};
   const lng = parseFloat(body.longitude);
   const lat = parseFloat(body.latitude);
@@ -88,8 +90,7 @@ app.post("/api/seatings", (req, res) => {
   ].join(",");
 
   try {
-    ensureCsv();
-    fs.appendFileSync(CSV_PATH, `${line}\n`, "utf8");
+    await appendLine(line);
     const feature = toFeature({
       longitude: lng,
       latitude: lat,
@@ -105,7 +106,7 @@ app.post("/api/seatings", (req, res) => {
   }
 });
 
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname)));
 
 app.listen(PORT, () => {
   console.log(`server running at http://localhost:${PORT}`);

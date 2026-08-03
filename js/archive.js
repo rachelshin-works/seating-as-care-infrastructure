@@ -207,7 +207,9 @@ async function fetchText(url) {
     const [documentedText, undocText, communityText] = await Promise.all([
       fetchText("data/Seating_Locations_20260319.csv"),
       fetchText("data/0724_undocumented_seatings.csv"),
-      fetchText("data/community_seatings.csv"),
+      fetchText("/api/seatings").catch(() =>
+        fetchText("data/community_seatings.csv")
+      ),
     ]);
 
     const allItems = [

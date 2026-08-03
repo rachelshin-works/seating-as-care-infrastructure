@@ -535,7 +535,13 @@ map.on("load", async () => {
     }
 
     try {
-      community = communityToGeoJSON(await fetchText("data/community_seatings.csv"));
+      let communityText;
+      try {
+        communityText = await fetchText("/api/seatings");
+      } catch (_) {
+        communityText = await fetchText("data/community_seatings.csv");
+      }
+      community = communityToGeoJSON(communityText);
     } catch (err) {
       console.error(err);
     }
