@@ -204,7 +204,7 @@ const seatPopupDateLabel = document.getElementById("seat-popup-date-label");
 const seatPopupDate = document.getElementById("seat-popup-date");
 const seatPopupClose = document.querySelector(".seat-popup__close");
 
-function setSelectedPointGlow(lng, lat) {
+function setSelectedPointGlow(lng, lat, mode = "pick") {
   if (!map.getSource("selected-point")) return;
   map.getSource("selected-point").setData({
     type: "FeatureCollection",
@@ -215,7 +215,7 @@ function setSelectedPointGlow(lng, lat) {
           type: "Point",
           coordinates: [Number(lng), Number(lat)],
         },
-        properties: {},
+        properties: { mode },
       },
     ],
   });
@@ -229,7 +229,44 @@ function clearSelectedPointGlow() {
   });
 }
 
-function showSeatPopup(props, point, lngLat) {
+let popupAnchor = null;
+
+function positionSeatPopup() {
+  if (!popupAnchor || seatPopup.hidden || seatPopup.classList.contains("is-hidden")) {
+    return;
+  }
+
+  const point = map.project([popupAnchor.lng, popupAnchor.lat]);
+  const mapRect = map.getContainer().getBoundingClientRect();
+  const pad = 8;
+  const offset = 8;
+
+  seatPopup.hidden = false;
+  seatPopup.classList.remove("is-hidden");
+
+  const popupW = seatPopup.offsetWidth || 240;
+  const popupH = seatPopup.offsetHeight || 160;
+
+  let x = mapRect.left + point.x + offset;
+  let y = mapRect.top + point.y - popupH / 2;
+
+  // flip to left if it would overflow the right edge
+  if (x + popupW + pad > window.innerWidth) {
+    x = mapRect.left + point.x - popupW - offset;
+  }
+  // keep vertically near the point
+  if (y < pad) y = pad;
+  if (y + popupH + pad > window.innerHeight) {
+    y = window.innerHeight - popupH - pad;
+  }
+
+  x = Math.max(pad, Math.min(x, window.innerWidth - popupW - pad));
+
+  seatPopup.style.left = `${x}px`;
+  seatPopup.style.top = `${y}px`;
+}
+
+function showSeatPopup(props, _point, lngLat) {
   const isUndoc = props.kind === "undocumented";
 
   seatPopupType.textContent = isUndoc ? "undocumented" : "documented";
@@ -243,35 +280,19 @@ function showSeatPopup(props, point, lngLat) {
   seatPopup.hidden = false;
   seatPopup.classList.remove("is-hidden");
 
-  if (lngLat) setSelectedPointGlow(lngLat.lng, lngLat.lat);
-
-  const offset = 14;
-  const mapRect = map.getContainer().getBoundingClientRect();
-  const pad = 8;
-
-  let x = mapRect.left + point.x + offset;
-  let y = mapRect.top + point.y + offset;
-
-  const popupW = seatPopup.offsetWidth;
-  const popupH = seatPopup.offsetHeight;
-
-  if (x + popupW + pad > window.innerWidth) {
-    x = mapRect.left + point.x - popupW - offset;
-  }
-  if (y + popupH + pad > window.innerHeight) {
-    y = mapRect.top + point.y - popupH - offset;
+  if (lngLat) {
+    popupAnchor = { lng: lngLat.lng, lat: lngLat.lat };
+    // existing seats: mint glow only (no solid mint core on top)
+    setSelectedPointGlow(lngLat.lng, lngLat.lat, "select");
   }
 
-  x = Math.max(pad, Math.min(x, window.innerWidth - popupW - pad));
-  y = Math.max(pad, Math.min(y, window.innerHeight - popupH - pad));
-
-  seatPopup.style.left = `${x}px`;
-  seatPopup.style.top = `${y}px`;
+  positionSeatPopup();
 }
 
 function hideSeatPopup() {
   seatPopup.classList.add("is-hidden");
   seatPopup.hidden = true;
+  popupAnchor = null;
   // keep mint pick marker visible even after the popup closes
 }
 
@@ -448,20 +469,12 @@ function bindPointLayer(layerId) {
     if (!feature) return;
     e.originalEvent?.stopPropagation?.();
 
-    // if the form is open, fill coords + pan/glow; still show the seat popup
-    const picking =
-      typeof window.onMapPickLocation === "function" &&
-      window.onMapPickLocation(e.lngLat.lng, e.lngLat.lat);
+    // fill form coords if open, but don't pan — keep popup glued to the point
+    if (typeof window.onMapPickLocation === "function") {
+      window.onMapPickLocation(e.lngLat.lng, e.lngLat.lat, { pan: false });
+    }
 
     showSeatPopup(feature.properties, e.point, e.lngLat);
-
-    // picking already eased the map; for browse-only, gently center the seat
-    if (!picking) {
-      map.easeTo({
-        center: [e.lngLat.lng, e.lngLat.lat],
-        duration: 500,
-      });
-    }
   });
 
   map.on("mouseenter", layerId, () => {
@@ -574,7 +587,7 @@ map.on("load", async () => {
       },
     });
 
-    // mint glow + core for selected / picked points
+    // mint glow for selected seats; solid core only for new map picks
     map.addSource("selected-point", {
       type: "geojson",
       data: { type: "FeatureCollection", features: [] },
@@ -607,6 +620,7 @@ map.on("load", async () => {
       id: "selected-point-core",
       type: "circle",
       source: "selected-point",
+      filter: ["==", ["get", "mode"], "pick"],
       paint: {
         "circle-radius": [
           "interpolate",
@@ -630,18 +644,26 @@ map.on("load", async () => {
     bindPointLayer("seating-points");
     bindPointLayer("undocumented-points");
 
+    map.on("move", positionSeatPopup);
+    map.on("resize", positionSeatPopup);
+
     map.on("click", (e) => {
+      const hits = map.queryRenderedFeatures(e.point, {
+        layers: ["seating-points", "undocumented-points"],
+      });
+      // point layers handle their own click (info popup); don't re-run pick here
+      if (hits.length) return;
+
       if (
         typeof window.onMapPickLocation === "function" &&
         window.onMapPickLocation(e.lngLat.lng, e.lngLat.lat)
       ) {
+        hideSeatPopup();
         return;
       }
 
-      const hits = map.queryRenderedFeatures(e.point, {
-        layers: ["seating-points", "undocumented-points"],
-      });
-      if (!hits.length) hideSeatPopup();
+      hideSeatPopup();
+      clearSelectedPointGlow();
     });
 
     window.focusMapLocation = function focusMapLocation(lng, lat) {
@@ -653,7 +675,8 @@ map.on("load", async () => {
       // close info popup UI without clearing the pick glow
       seatPopup.classList.add("is-hidden");
       seatPopup.hidden = true;
-      setSelectedPointGlow(coordinates[0], coordinates[1]);
+      popupAnchor = null;
+      setSelectedPointGlow(coordinates[0], coordinates[1], "pick");
 
       const mobile = window.matchMedia("(max-width: 720px)").matches;
       map.easeTo({

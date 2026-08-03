@@ -132,18 +132,18 @@ panelChip.addEventListener("click", expandMapPanel);
 locateBtn.addEventListener("click", requestLocation);
 window.addEventListener("resize", syncPanelChipWidth);
 
-window.onMapPickLocation = function onMapPickLocation(lng, lat) {
-  // always drop/move the mint marker, even when collective map is closed
-  if (typeof window.focusMapLocation === "function") {
+window.onMapPickLocation = function onMapPickLocation(lng, lat, opts = {}) {
+  // only pick for the form while collective map is open
+  if (panel.hidden || !pickOnMap) return false;
+
+  const pan = opts.pan !== false;
+  if (pan && typeof window.focusMapLocation === "function") {
     window.focusMapLocation(lng, lat);
   }
 
-  if (!panel.hidden && pickOnMap) {
-    lngInput.value = Number(lng).toFixed(6);
-    latInput.value = Number(lat).toFixed(6);
-    setStatus("location ready (map)");
-  }
-
+  lngInput.value = Number(lng).toFixed(6);
+  latInput.value = Number(lat).toFixed(6);
+  setStatus("location ready (map)");
   return true;
 };
 
